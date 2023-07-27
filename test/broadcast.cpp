@@ -20,11 +20,16 @@ int initialNodeConfig[9][3] = {
 int x, y, elevel, leader;
 
 // Function to be executed by each thread
-void count(int rank) {
+void count(int argc, char** argv) {
+    int rank;
+    // Initialize MPI environment
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, nullptr);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     x = initialNodeConfig[rank][0];
     y = initialNodeConfig[rank][1];
     elevel = initialNodeConfig[rank][2];
-
+    cout<< "Running thread: " << rank << endl;
     while(elevel > 0) {
         // cout << "Thread: " << rank << " energy level is: " << elevel<< endl;
         // Perform some computation here (e.g., use rank for different tasks)
@@ -34,16 +39,7 @@ void count(int rank) {
     }
 }
 
-void threadFunction2(int rank) {
-    std::cout << "Thread f2 " << rank << " is running." << std::endl;
-    // Perform some computation here (e.g., use rank for different tasks)
-}
-
-
-int main(int argc, char** argv) {
-
-    leader = 0; // To test broadcast
-
+void threadFunction2(int argc, char** argv) {
     // Initialize MPI environment
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, nullptr);
 
@@ -51,18 +47,11 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Get the process ID (rank)
     MPI_Comm_size(MPI_COMM_WORLD, &size); // Get the total number of processes
 
-    thread t1(count, rank);
-    thread t2(threadFunction2, rank);
-
-    t1.join();
-    t2.join();
-
     int data = 0;
     if (rank == leader) {
         cout << "Leader: " << rank << endl;
         data = 100;
     }
-
     // Move broadcast block to separate function becuase this is run after completing the t1 and t2
 
     // Broadcast the data from root (rank 0) to all other processes
@@ -72,5 +61,18 @@ int main(int argc, char** argv) {
     
     // Finalize MPI environment
     MPI_Finalize();
+}
+
+
+int main(int argc, char** argv) {
+
+    leader = 0; // To test broadcast
+
+    thread t1(count, argc, argv);
+    thread t2(threadFunction2, argc, argv);
+
+    t1.join();
+    t2.join();
+    
     return 0;
 }
