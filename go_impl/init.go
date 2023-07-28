@@ -76,7 +76,7 @@ func newNode(x, y, energyLevel int) *Node {
 		doElectionSent:      false,
 		doElectionResponses: make(map[int]bool),
 		heartBeatSent:       false,
-		msgTimeout:          1000,
+		msgTimeout:          500,
 	}
 }
 
@@ -192,8 +192,9 @@ func (node *Node) checkHeartBeat() bool {
 		node.heartBeatSent = true
 		node.lastHeartBeatTime = node.getCurrentTimestamp()
 	} else {
-		if node.getCurrentTimestamp()-node.lastHeartBeatTime > node.msgTimeout {
-			// Node at (x, y) - Leader down!
+		diff := node.getCurrentTimestamp() - node.lastHeartBeatTime
+		fmt.Printf("Timeout Diff: %v, Node ID: %v, Group ID: %v, Leader ID: %v\n", diff, node.id, node.groupID, node.leader.id)
+		if diff > node.msgTimeout {
 			node.heartBeatSent = false
 			node.startElection()
 		}
@@ -252,7 +253,8 @@ func (node *Node) startElection() {
 }
 
 func (node *Node) getCurrentTimestamp() int64 {
-	return int64(node.id * 50)
+	currentTime := time.Now().UnixNano() / int64(time.Millisecond)
+	return currentTime
 }
 
 func (node *Node) toString() string {
@@ -265,30 +267,41 @@ func (node *Node) run(wg *sync.WaitGroup) {
 		node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
 	nodeRemoved := false
 	for node.energyLevel > 0 {
-		// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Inside Run , Energy Level: %v, (x,y): (%v,%v)\n",
-		// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+		// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Inside Run , Energy Level: %v\n",
+		// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
 		select {
 		case msg := <-node.msgQueue:
+			// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Msg: %#v , Energy Level: %v\n",
+			// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, msg, node.energyLevel)
 			if !node.parseMsg(msg) {
 				nodeRemoved = true
+				// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from parseMsg , Energy Level: %v\n",
+				// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+
 			}
 		default:
 			if node.isElectionOngoing {
 				if node.isElectionCandidate {
 					if !node.checkElection() {
 						nodeRemoved = true
+						// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkElection , Energy Level: %v\n",
+						// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
 					}
 				}
 			} else {
 				if !node.isLeader {
 					if !node.checkHeartBeat() {
 						nodeRemoved = true
+						// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkHeartBeat , Energy Level: %v\n",
+						// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
 					}
 				}
 			}
 
 			if !node.consumeEnergyToLive() {
 				nodeRemoved = true
+				// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from consumeEnergy , Energy Level: %v\n",
+				// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
 			}
 
 			if nodeRemoved {
