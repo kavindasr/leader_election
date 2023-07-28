@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Node represents a single node in the distributed system.
@@ -28,8 +29,8 @@ type Node struct {
 	heartBeatSent       bool
 	lastHeartBeatTime   int64
 	msgTimeout          int64
-	lock                sync.Mutex
 	doElectionResponses map[int]bool
+	lock                sync.Mutex
 }
 
 // Msg is an interface for messages passed among distributed nodes.
@@ -255,49 +256,60 @@ func (node *Node) getCurrentTimestamp() int64 {
 }
 
 func (node *Node) toString() string {
-	return fmt.Sprintf("Node{x=%d, y=%d, isLeader=%t, groupId=%d}", node.x, node.y, node.isLeader, node.groupID)
+	return fmt.Sprintf("Node{Node ID: %v, x=%d, y=%d, isLeader=%t, groupId=%d}", node.id, node.x, node.y, node.isLeader, node.groupID)
 }
 
 func (node *Node) run(wg *sync.WaitGroup) {
 	defer wg.Done()
 	fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Start, Energy Level: %v, (x,y): (%v,%v)\n",
 		node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
-
+	nodeRemoved := false
 	for node.energyLevel > 0 {
+		// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Inside Run , Energy Level: %v, (x,y): (%v,%v)\n",
+		// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
 		select {
 		case msg := <-node.msgQueue:
 			if !node.parseMsg(msg) {
-				return
+				nodeRemoved = true
 			}
 		default:
 			if node.isElectionOngoing {
 				if node.isElectionCandidate {
 					if !node.checkElection() {
-						return
+						nodeRemoved = true
 					}
 				}
 			} else {
 				if !node.isLeader {
 					if !node.checkHeartBeat() {
-						return
+						nodeRemoved = true
 					}
 				}
 			}
 
 			if !node.consumeEnergyToLive() {
+				nodeRemoved = true
+			}
+
+			if nodeRemoved {
+				node.isAlive = false
+				node.energyLevel = 0 // Set correct energy level in case of a break
+
+				fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: NodeRemoved, Energy Level: %v, (x,y): (%v,%v)\n",
+					node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+
 				return
 			}
 
 			// Adding some delay between simulation steps
 			// Simulating sleep for 50 milliseconds.
-			// This is similar to Thread.sleep(50) in Java.
-			node.lock.Lock()
-			node.lock.Unlock()
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 
 	node.isAlive = false
 	node.energyLevel = 0 // Set correct energy level in case of a break
+
 	fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: NodeRemoved, Energy Level: %v, (x,y): (%v,%v)\n",
 		node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
 }
