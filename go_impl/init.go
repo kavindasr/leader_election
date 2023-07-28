@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Node represents a single node in the distributed system.
@@ -143,11 +145,13 @@ func (node *Node) parseMsg(msg Msg) bool {
 			if !node.consumeMsgEnergy() {
 				return false
 			}
-			fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: HeartBeatAck, Energy Level: %v, (x,y): (%v,%v)\n",
-				node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+
+			logMsg := fmt.Sprintf("Action: HeartBeatAck, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+				node.id, node.groupID, node.leader.id, node.energyLevel)
+			log.Info(logMsg)
 			m.sender.sendMessage(HeartBeatAck{sender: node})
 		} else {
-			// Heartbeat received by non-leader!
+			log.Info("received by non-leader!")
 		}
 	case HeartBeatAck:
 		node.heartBeatSent = false
@@ -157,8 +161,9 @@ func (node *Node) parseMsg(msg Msg) bool {
 			if !node.consumeMsgEnergy() {
 				return false
 			}
-			fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: DoElectionAck(stanDown), Energy Level: %v, (x,y): (%v,%v)\n",
-				node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+			logMsg := fmt.Sprintf("Action: DoElectionAck, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+				node.id, node.groupID, node.leader.id, node.energyLevel)
+			log.Info(logMsg)
 			m.sender.sendMessage(DoElectionAck{sender: node, standDown: true})
 			node.startElection()
 		} else {
@@ -169,8 +174,9 @@ func (node *Node) parseMsg(msg Msg) bool {
 			if !node.consumeMsgEnergy() {
 				return false
 			}
-			fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: DoElectionAck(!stanDown), Energy Level: %v, (x,y): (%v,%v)\n",
-				node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+			logMsg := fmt.Sprintf("Action: DoElectionAck, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+				node.id, node.groupID, node.leader.id, node.energyLevel)
+			log.Info(logMsg)
 			m.sender.sendMessage(DoElectionAck{sender: node, standDown: false})
 		}
 	case DoElectionAck:
@@ -186,14 +192,15 @@ func (node *Node) checkHeartBeat() bool {
 		if !node.consumeMsgEnergy() {
 			return false
 		}
-		fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: HeartBeat, Energy Level: %v, (x,y): (%v,%v)\n",
-			node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+		logMsg := fmt.Sprintf("Action: HeartBeat, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+			node.id, node.groupID, node.leader.id, node.energyLevel)
+		log.Info(logMsg)
 		node.leader.sendMessage(HeartBeat{sender: node})
 		node.heartBeatSent = true
 		node.lastHeartBeatTime = node.getCurrentTimestamp()
 	} else {
 		diff := node.getCurrentTimestamp() - node.lastHeartBeatTime
-		fmt.Printf("Timeout Diff: %v, Node ID: %v, Group ID: %v, Leader ID: %v\n", diff, node.id, node.groupID, node.leader.id)
+		// logMsg := fmt.Sprintf("Timeout Diff: %v, Node ID: %v, Group ID: %v, Leader ID: %v\n", diff, node.id, node.groupID, node.leader.id)
 		if diff > node.msgTimeout {
 			node.heartBeatSent = false
 			node.startElection()
@@ -218,8 +225,9 @@ func (node *Node) checkElection() bool {
 					if !node.consumeMsgEnergy() {
 						return false
 					}
-					fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: ElectionResult, Energy Level: %v, (x,y): (%v,%v)\n",
-						node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+					logMsg := fmt.Sprintf("Action: ElectionResult, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+						node.id, node.groupID, node.leader.id, node.energyLevel)
+					log.Warn(logMsg)
 					n.sendMessage(ElectionResult{sender: node})
 				}
 			}
@@ -243,8 +251,9 @@ func (node *Node) startElection() {
 			if !node.consumeMsgEnergy() {
 				return
 			}
-			fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: DoElection, Energy Level: %v, (x,y): (%v,%v)\n",
-				node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+			logMsg := fmt.Sprintf("Action: DoElection, Node ID: %v, Group ID: %v, Leader ID: %v,  Energy Level: %v\n",
+				node.id, node.groupID, node.leader.id, node.energyLevel)
+			log.Info(logMsg)
 			n.sendMessage(DoElection{sender: node, senderEnergyLevel: node.energyLevel})
 		}
 	}
@@ -263,20 +272,21 @@ func (node *Node) toString() string {
 
 func (node *Node) run(wg *sync.WaitGroup) {
 	defer wg.Done()
-	fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Start, Energy Level: %v, (x,y): (%v,%v)\n",
-		node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+	logMsg := fmt.Sprintf("Action: Start, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+		node.id, node.groupID, node.leader.id, node.energyLevel)
+	log.Info(logMsg)
 	nodeRemoved := false
 	for node.energyLevel > 0 {
-		// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: Inside Run , Energy Level: %v\n",
-		// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+		// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Action: Inside Run , Energy Level: %v\n",
+		// 	node.id, node.groupID, node.leader.id, node.energyLevel)
 		select {
 		case msg := <-node.msgQueue:
-			// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Msg: %#v , Energy Level: %v\n",
-			// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, msg, node.energyLevel)
+			// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Msg: %#v , Energy Level: %v\n",
+			// 	node.id, node.groupID, node.leader.id, msg, node.energyLevel)
 			if !node.parseMsg(msg) {
 				nodeRemoved = true
-				// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from parseMsg , Energy Level: %v\n",
-				// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+				// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from parseMsg , Energy Level: %v\n",
+				// 	node.id, node.groupID, node.leader.id, node.energyLevel)
 
 			}
 		default:
@@ -284,33 +294,33 @@ func (node *Node) run(wg *sync.WaitGroup) {
 				if node.isElectionCandidate {
 					if !node.checkElection() {
 						nodeRemoved = true
-						// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkElection , Energy Level: %v\n",
-						// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+						// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkElection , Energy Level: %v\n",
+						// 	node.id, node.groupID, node.leader.id, node.energyLevel)
 					}
 				}
 			} else {
 				if !node.isLeader {
 					if !node.checkHeartBeat() {
 						nodeRemoved = true
-						// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkHeartBeat , Energy Level: %v\n",
-						// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+						// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from checkHeartBeat , Energy Level: %v\n",
+						// 	node.id, node.groupID, node.leader.id, node.energyLevel)
 					}
 				}
 			}
 
 			if !node.consumeEnergyToLive() {
 				nodeRemoved = true
-				// fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from consumeEnergy , Energy Level: %v\n",
-				// 	node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel)
+				// logMsg := fmt.Sprintf("Node ID: %v, Group ID: %v, Leader ID: %v, Return: Retuned from consumeEnergy , Energy Level: %v\n",
+				// 	node.id, node.groupID, node.leader.id, node.energyLevel)
 			}
 
 			if nodeRemoved {
 				node.isAlive = false
 				node.energyLevel = 0 // Set correct energy level in case of a break
 
-				fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: NodeRemoved, Energy Level: %v, (x,y): (%v,%v)\n",
-					node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
-
+				logMsg := fmt.Sprintf("Action: NodeRemoved, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+					node.id, node.groupID, node.leader.id, node.energyLevel)
+				log.Error(logMsg)
 				return
 			}
 
@@ -323,8 +333,9 @@ func (node *Node) run(wg *sync.WaitGroup) {
 	node.isAlive = false
 	node.energyLevel = 0 // Set correct energy level in case of a break
 
-	fmt.Printf("Timestamp: %v, Node ID: %v, Group ID: %v, Leader ID: %v, Action: NodeRemoved, Energy Level: %v, (x,y): (%v,%v)\n",
-		node.getCurrentTimestamp(), node.id, node.groupID, node.leader.id, node.energyLevel, node.x, node.y)
+	logMsg = fmt.Sprintf("Action: NodeRemoved, Node ID: %v, Group ID: %v, Leader ID: %v, Energy Level: %v\n",
+		node.id, node.groupID, node.leader.id, node.energyLevel)
+	log.Warn(logMsg)
 }
 
 func sortNodes(nodes []*Node) {
@@ -411,7 +422,7 @@ func main() {
 
 	// Initial leader selection and group formation
 	groups := formGroups(nodes)
-	fmt.Println("\nInitial list of nodes:\n")
+	fmt.Println("\nInitial list of nodes:")
 	for _, group := range groups {
 		for _, node := range group {
 			fmt.Println(node.toString())
@@ -422,7 +433,7 @@ func main() {
 	wg.Add(len(nodes))
 
 	// Start the simulation by running each node as a separate goroutine
-	fmt.Println("\nStarting simulation...\n")
+	fmt.Println("\nStarting simulation...")
 	for _, group := range groups {
 		for _, node := range group {
 			go node.run(&wg)
