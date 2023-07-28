@@ -48,7 +48,7 @@ void main_flow(int rank) {
     y = initialNodeConfig[rank][1];
     elevel = initialNodeConfig[rank][2];
 
-    if (leader == -1 && rank == 0 ) {
+    if (leader == -1) {
         cout << "Leader not defined, found by: " << rank << endl;
         node_details[0] = x;
         node_details[1] = y;
